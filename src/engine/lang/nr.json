@@ -1,0 +1,45 @@
+{
+  "code": "nr",
+  "name": "isiNdebele",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "ngibawa",
+    "etja",
+    "namkha",
+    "ngimi",
+    "yami",
+    "imali",
+    "ukuthi"
+  ],
+  "phrases": {
+    "urgent": [
+      "msinyana"
+    ],
+    "money": [],
+    "secret": [],
+    "otp": [],
+    "request": [
+      "thumela",
+      "ngithumelele",
+      "ngitjele",
+      "nginikela"
+    ],
+    "threat": [
+      "izokuvalwa",
+      "izovalwa"
+    ],
+    "prize": [],
+    "known": [
+      "inomboro yami etja"
+    ],
+    "bank": [
+      "ibhanga"
+    ],
+    "police": [
+      "amapholisa"
+    ],
+    "verify": []
+  }
+}

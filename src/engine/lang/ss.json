@@ -1,0 +1,57 @@
+{
+  "code": "ss",
+  "name": "siSwati",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "lami",
+    "nyalo",
+    "kutsi",
+    "lensha",
+    "ungatjeli",
+    "masinyane",
+    "lamuhla",
+    "ngimi",
+    "ngicela",
+    "imali"
+  ],
+  "phrases": {
+    "urgent": [
+      "nyalo",
+      "masinyane",
+      "lamuhla"
+    ],
+    "money": [
+      "tfumela imali"
+    ],
+    "secret": [
+      "ungatjeli"
+    ],
+    "otp": [],
+    "request": [
+      "tfumela",
+      "ngitfumelele",
+      "ngitjele",
+      "nginike",
+      "ungitfumelele"
+    ],
+    "threat": [
+      "itawuvalwa"
+    ],
+    "prize": [
+      "uwinile"
+    ],
+    "known": [
+      "ngimi",
+      "inombolo yami lensha"
+    ],
+    "bank": [
+      "libhange"
+    ],
+    "police": [
+      "emaphoyisa"
+    ],
+    "verify": []
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "code": "ve",
+  "name": "Tshivenda",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "nṋe",
+    "tshelede",
+    "zwino",
+    "humbela",
+    "ndi",
+    "ni",
+    "vha",
+    "kana",
+    "ṋamusi",
+    "ntswa",
+    "yanga"
+  ],
+  "phrases": {
+    "urgent": [
+      "zwino",
+      "nga u ṱavhanya",
+      "ṋamusi"
+    ],
+    "money": [
+      "tshelede",
+      "rumela tshelede",
+      "badela"
+    ],
+    "secret": [
+      "ni songo vhudza",
+      "tshiphiri"
+    ],
+    "otp": [],
+    "request": [
+      "rumela",
+      "nthumelele",
+      "mmbudze",
+      "nṋea"
+    ],
+    "threat": [
+      "i ḓo thivhelwa"
+    ],
+    "prize": [],
+    "known": [
+      "ndi nṋe",
+      "nomboro yanga ntswa"
+    ],
+    "bank": [
+      "bannga"
+    ],
+    "police": [
+      "mapholisa"
+    ],
+    "verify": [
+      "khwaṱhisedza"
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "code": "xh",
+  "name": "isiXhosa",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "ndicela",
+    "nceda",
+    "yam",
+    "molo",
+    "molweni",
+    "ngoku",
+    "kwaye",
+    "enkosi",
+    "ndithumelele",
+    "ukuba",
+    "niphumelele",
+    "nifumane",
+    "ndim",
+    "esiyithumele",
+    "thumelani",
+    "yenu",
+    "okanye",
+    "namhlanje"
+  ],
+  "phrases": {
+    "urgent": [
+      "ngoku",
+      "ngokukhawuleza",
+      "kungxamisekile",
+      "namhlanje"
+    ],
+    "money": [
+      "ndithumelele"
+    ],
+    "secret": [
+      "musa ukuxelela",
+      "ungaxeleli"
+    ],
+    "otp": [
+      "ikhowudi"
+    ],
+    "request": [
+      "thumela",
+      "thumelani",
+      "ndithumelele",
+      "ndixelele",
+      "ndinike"
+    ],
+    "threat": [
+      "uza kubanjwa"
+    ],
+    "prize": [
+      "uphumelele",
+      "niphumelele",
+      "ibhaso"
+    ],
+    "known": [
+      "ndim",
+      "inombolo yam entsha",
+      "ndilahlekelwe yifowuni"
+    ],
+    "bank": [
+      "ibhanki"
+    ],
+    "police": [
+      "amapolisa"
+    ],
+    "verify": [
+      "qinisekisa"
+    ]
+  }
+}

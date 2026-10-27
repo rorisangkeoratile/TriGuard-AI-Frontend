@@ -1,0 +1,91 @@
+{
+  "code": "zu",
+  "name": "isiZulu",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "mntanami",
+    "okumnandi",
+    "ngicela",
+    "ukuthi",
+    "kodwa",
+    "yami",
+    "wena",
+    "manje",
+    "sawubona",
+    "ngiyabonga",
+    "ungatsheli",
+    "yimina",
+    "kakhulu",
+    "lokhu",
+    "ngilahlekelwe",
+    "entsha",
+    "ngithumelele",
+    "kuphuthumile",
+    "noma",
+    "ngizofika",
+    "kusihlwa",
+    "sisi",
+    "baba",
+    "imali"
+  ],
+  "phrases": {
+    "urgent": [
+      "manje",
+      "ngokushesha",
+      "kuphuthumile"
+    ],
+    "money": [
+      "thumela imali",
+      "ngithumelele",
+      "imali",
+      "khokha",
+      "ungithumelele"
+    ],
+    "secret": [
+      "ungatsheli",
+      "ungatsheli muntu"
+    ],
+    "otp": [
+      "phasiwedi",
+      "iphasiwedi",
+      "ikhodi",
+      "iphini",
+      "phinikhoutu"
+    ],
+    "request": [
+      "thumela",
+      "ngithumelele",
+      "ngitshele",
+      "nginike",
+      "funda",
+      "ungithumelele"
+    ],
+    "threat": [
+      "kuzovinjwa",
+      "kuvinjiwe",
+      "uzoboshwa",
+      "iyavalwa"
+    ],
+    "prize": [
+      "uwine",
+      "umklomelo"
+    ],
+    "known": [
+      "yimina",
+      "inombolo yami entsha",
+      "ngilahlekelwe yifoni"
+    ],
+    "bank": [
+      "ibhange"
+    ],
+    "police": [
+      "amaphoyisa",
+      "iphoyisa"
+    ],
+    "verify": [
+      "qinisekisa"
+    ]
+  }
+}

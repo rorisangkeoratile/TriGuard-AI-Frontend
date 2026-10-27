@@ -1,0 +1,64 @@
+{
+  "code": "nso",
+  "name": "Sepedi",
+  "status": "draft",
+  "reviewedBy": null,
+  "note": "Draft list. A native speaker must review and extend it before release.",
+  "words": [
+    "gomme",
+    "bjale",
+    "tšhelete",
+    "kgopela",
+    "mpsha",
+    "botša",
+    "lehono",
+    "goba",
+    "gago",
+    "gore",
+    "ke",
+    "ya",
+    "ka"
+  ],
+  "phrases": {
+    "urgent": [
+      "bjale",
+      "ka pela",
+      "lehono"
+    ],
+    "money": [
+      "tšhelete"
+    ],
+    "secret": [
+      "o se ke wa botša",
+      "sephiri"
+    ],
+    "otp": [
+      "khoutu",
+      "dikhoutu"
+    ],
+    "request": [
+      "romela",
+      "ntomelele",
+      "mpotše",
+      "mpha"
+    ],
+    "threat": [
+      "o tla swarwa"
+    ],
+    "prize": [
+      "o thopile"
+    ],
+    "known": [
+      "nomoro ya ka ye mpsha"
+    ],
+    "bank": [
+      "panka"
+    ],
+    "police": [
+      "maphodisa"
+    ],
+    "verify": [
+      "netefatsa"
+    ]
+  }
+}
