@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { reportScam } from '../services/api.js'
 
 const CHANNELS = ['Call', 'SMS', 'WhatsApp']
-const SCAM_TYPES = ['Banking / OTP', 'Fake delivery', 'Job offer', 'Prize / lottery', 'Family emergency', 'Other']
+const SCAM_TYPES = ['Banking / OTP', 'Fake delivery', 'Job offer', 'Prize / lottery', 'Family emergency', 'AI voice clone', 'Other']
 
 // Placeholder: functional form, full design comes later.
 export default function Report() {
