@@ -22,9 +22,21 @@ export default function NewCheck() {
   const [errors, setErrors] = useState({})
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fromOutlook, setFromOutlook] = useState(false)
   const abortRef = useRef(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  // "Put the payment on hold" in the Outlook add-in opens this page with the email in the URL fragment (#), which
+  // never reaches the web server. Load it into a text check, then clear it from the address bar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    if (params.get('from') !== 'outlook' || !params.get('text')) return
+    setKind('text')
+    setForm(f => ({ ...f, text: params.get('text') }))
+    setFromOutlook(true)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
 
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
@@ -83,6 +95,12 @@ export default function NewCheck() {
       </div>
 
       <Alert>{error}</Alert>
+      {fromOutlook && (
+        <p className="card">
+          <b>Email from Outlook.</b> Answer the payment questions and check it. The payment stays on hold until someone
+          calls the person back on their saved number and enters your payment PIN.
+        </p>
+      )}
 
       <form className="card form" onSubmit={submit} noValidate>
         <div className="seg" role="tablist" aria-label="What did you receive?">

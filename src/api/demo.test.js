@@ -111,6 +111,17 @@ describe('demo mode API', () => {
     expect(check.signals.map(s => s.id)).toEqual(expect.arrayContaining(['authority', 'untraceable', 'till_cash', 'secrecy']))
   })
 
+  it('flags a fake executive who offers a video call as proof (the Arup pattern)', async () => {
+    await owner()
+    const check = await post('/checks/text', {
+      text: 'From the CFO: process the confidential transfer today. Let’s confirm on a Teams call: https://teams.microsoft.com/l/meetup-join/abc',
+      skip_approval: true,
+    })
+    expect(check.level).toBe('high')
+    expect(check.signals.map(s => s.id)).toEqual(expect.arrayContaining(['meeting_link', 'authority', 'secrecy']))
+    expect(check.callback_status).toBe('pending') // the payment stays on hold until a call-back
+  })
+
   it('never releases a payment without a confirmed call-back', async () => {
     await owner()
     const check = await post('/checks/text', { text: 'Please pay R5 000 to the usual supplier.' })

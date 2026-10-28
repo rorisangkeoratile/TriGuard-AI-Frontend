@@ -157,6 +157,8 @@ const RULES = [
   ['untraceable', 25, /\b(gift ?cards?|vouchers?|airtime|data bundles?|prepaid electricity|bitcoin|crypto|ewallet|cash send|instant money)\b/, 'Asks for airtime, vouchers, eWallet or crypto, which can’t be reversed.'],
   // Retail: cash taken straight from the store.
   ['till_cash', 25, /\b(from the till|till money|cash[- ]?up|the float|from the safe|petty cash|banking bag|cash deposit)\b/, 'Asks for cash from the till, float or safe. Owners and head office don’t collect store cash by voice note or SMS.'],
+  // The Arup pattern: "let's confirm on a call" with a meeting the requester controls.
+  ['meeting_link', 20, /teams\.microsoft\.com|teams\.live\.com|zoom\.us\/(j|my)\/|meet\.google\.com\/|\b(teams|zoom|google meet) (call|meeting)\b|\bvideo (call|conference|meeting)\b/, 'Wants to confirm over a video call it set up. Deepfakes can copy a face and voice live on a call, so that isn’t proof. Call back on the saved number instead.'],
   ['stock_delivery', 15, /\b(stock delivery|delivery fee|cash on delivery|cod|pay the driver|release the stock)\b/, 'Ties the payment to a stock delivery. Fake suppliers use urgent deliveries to rush payments.'],
 ]
 
