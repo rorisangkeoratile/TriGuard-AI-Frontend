@@ -177,11 +177,13 @@ const readAnswer = v => (v === true || v === 'true' ? true : v === false || v ==
 // and not stored. Tries twice, then returns null.
 // The deployed site has no Vite proxy, so it calls the backend at VITE_API_URL directly (allowed by its CORS list).
 const VOICE_API = import.meta.env.PROD ? (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') : ''
-async function serverVoice(file) {
+const LANGUAGE_NAMES = { en: 'English', zu: 'isiZulu', af: 'Afrikaans' }
+async function serverVoice(file, audioLanguage) {
   if (!(file instanceof Blob)) return null
   const form = new FormData()
   form.append('file', file)
-  form.append('language', 'en')
+  form.append('language', 'en') // results and translations in English
+  if (LANGUAGE_NAMES[audioLanguage]) form.append('audio_language', audioLanguage)
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await fetch(VOICE_API + '/api/v1/voice/analyze', { method: 'POST', body: form })
@@ -273,7 +275,9 @@ function createCheck(user, kind, fields, server = null) {
   const model = server?.model?.available ? server.model : null
   const voiceScore = typeof model?.synthetic_probability === 'number' ? model.synthetic_probability : null
 
-  const result = assess({ text, contact, senderNumber: fields.sender_number || '', answers, voiceScore })
+  // The scam-script rules are mostly English, so also run them on the English translation of a local-language note.
+  const checked = [text, server?.transcript_english].filter(Boolean).join('\n')
+  const result = assess({ text: checked, contact, senderNumber: fields.sender_number || '', answers, voiceScore })
   // The server also reads the transcript in all 11 languages; use that when the English rules found nothing.
   const tr = server?.transcript_risk
   if (tr && ['high', 'critical'].includes(tr.risk_level) && !result.signals.some(s => s.guard === 'words' && s.points > 0)) {
@@ -307,7 +311,8 @@ function createCheck(user, kind, fields, server = null) {
     id: nextId(), org_id: user.org_id, created_by: user.id, kind,
     claimed_contact_id: contact ? contact.id : null,
     sender_number: fields.sender_number || '', content: text,
-    language: server?.audio_language || (text ? 'Not detected in demo mode' : ''),
+    content_english: server?.transcript_english || '',
+    language: server ? LANGUAGE_NAMES[server.audio_language] || server.audio_language || '' : (text ? 'Not detected in demo mode' : ''),
     payment_answers: answers,
     level: result.level, score: result.score, signals: result.signals, guards,
     voice_score: voiceScore, speaker_similarity: null,
@@ -504,7 +509,7 @@ export async function demoRequest(path, method, json, form) {
 
   if (parts[0] === 'checks') {
     if (route === '/checks/voice' && method === 'POST') {
-      const server = await serverVoice(body.file)
+      const server = await serverVoice(body.file, body.audio_language)
       // Never save a "Low risk" result for a voice nobody analysed.
       if (!server) fail(503, 'Couldn’t reach the TriGuard server to check the voice, so nothing was saved. Check your internet connection, keep this page open, and try again.')
       db = load() // the server check takes a while; pick up changes made meanwhile

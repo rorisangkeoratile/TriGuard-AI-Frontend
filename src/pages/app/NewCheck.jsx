@@ -7,7 +7,9 @@ import { useLoad } from '../../lib/useLoad.js'
 
 // POPIA section 10 (minimality): the payment check asks three yes/no questions instead of collecting
 // amounts, payee names or bank account numbers, which TriGuard doesn't need.
-const EMPTY = { text: '', claimed_contact_id: '', sender_number: '' }
+const EMPTY = { text: '', claimed_contact_id: '', sender_number: '', audio_language: 'en' }
+// Languages the voice check has been set up for so far. The rest of the 11 follow once native speakers have tested them.
+const SPOKEN_LANGUAGES = [['en', 'English'], ['zu', 'isiZulu'], ['af', 'Afrikaans']]
 const NO_ANSWERS = Object.fromEntries(PAYMENT_QUESTIONS.map(([key]) => [key, null]))
 
 export default function NewCheck() {
@@ -51,6 +53,7 @@ export default function NewCheck() {
     const details = {
       claimed_contact_id: form.claimed_contact_id || null,
       sender_number: form.sender_number ? normalisePhone(form.sender_number) : '',
+      ...(kind === 'voice' ? { audio_language: form.audio_language } : {}),
       ...answers,
     }
     setBusy(true)
@@ -98,6 +101,13 @@ export default function NewCheck() {
               )}
             </label>
             {previewUrl && <audio className="preview-audio" controls src={previewUrl} />}
+          </Field>
+        ) : null}
+        {kind === 'voice' ? (
+          <Field id="audio_language" label="Language spoken" hint="TriGuard writes down what was said in this language and translates it into English.">
+            <select id="audio_language" value={form.audio_language} onChange={set('audio_language')}>
+              {SPOKEN_LANGUAGES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+            </select>
           </Field>
         ) : (
           <Field id="text" label="The message" error={errors.text} hint="Paste the SMS or WhatsApp message exactly as you got it.">

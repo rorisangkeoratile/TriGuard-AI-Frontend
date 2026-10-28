@@ -74,6 +74,13 @@ export default function CheckDetail() {
             <h2>{check.kind === 'voice' ? 'What the voice note says' : 'The message'}</h2>
             {check.content ? <blockquote className="quote">{check.content}</blockquote> : <p className="muted">No transcript is available for this voice note.</p>}
             {check.language && <p className="small muted">Language: {check.language}</p>}
+            {check.content_english && (
+              <>
+                <h3 className="small">In English</h3>
+                <blockquote className="quote">{check.content_english}</blockquote>
+                <p className="small muted">Translated by AI. Ask someone who speaks the language if anything is unclear.</p>
+              </>
+            )}
           </section>
         </div>
 
