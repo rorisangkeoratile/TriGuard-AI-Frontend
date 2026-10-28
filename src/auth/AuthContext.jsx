@@ -10,6 +10,14 @@ const AuthContext = createContext(null)
 // lost or stolen is signed out within this time.
 const RECHECK_MS = 5000
 
+// Typing, clicking, scrolling or touching the page since the last re-check. Background re-checks alone don't keep
+// a session alive, so an unattended computer is signed out after the idle time.
+let usedSinceCheck = false
+const markUsed = () => { usedSinceCheck = true }
+if (typeof window !== 'undefined') {
+  for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(type, markUsed, { passive: true })
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // loading | in | out | offline
@@ -17,7 +25,9 @@ export function AuthProvider({ children }) {
 
   const refresh = useCallback(async () => {
     try {
-      const u = await auth.me()
+      const active = usedSinceCheck
+      usedSinceCheck = false
+      const u = await auth.me(active)
       setUser(prev => (JSON.stringify(prev) === JSON.stringify(u) ? prev : u))
       setStatus('in')
     } catch (err) {
@@ -48,7 +58,8 @@ export function AuthProvider({ children }) {
   }, [status, refresh])
 
   // Login and register send this device's key. They return { step: 'done', user } on an approved device,
-  // or { step: 'pending', device } while the store owner hasn't approved it yet.
+  // { step: 'pending', device } while the store owner hasn't approved it yet, or { step: 'otp', challenge } when
+  // the account has sign-in codes on and the code from the authenticator app is needed next (loginOtp).
   const enter = useCallback(async (call, body) => {
     setNotice('')
     const result = await call({ ...body, device_key: deviceKey(), device_name: deviceLabel() })
@@ -59,6 +70,7 @@ export function AuthProvider({ children }) {
     return result
   }, [])
   const login = useCallback(body => enter(auth.login, body), [enter])
+  const loginOtp = useCallback(body => enter(auth.loginOtp, body), [enter])
   const register = useCallback(body => enter(auth.register, body), [enter])
 
   const logout = useCallback(async () => {
@@ -69,8 +81,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, status, notice, login, register, logout, refresh }),
-    [user, status, notice, login, register, logout, refresh],
+    () => ({ user, status, notice, login, loginOtp, register, logout, refresh }),
+    [user, status, notice, login, loginOtp, register, logout, refresh],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

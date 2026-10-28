@@ -10,7 +10,8 @@ const toForm = fields => {
 }
 
 export const auth = {
-  me: () => request('/auth/me'),
+  // active: the person used the page since the last check, which keeps the session from timing out.
+  me: active => request(active ? '/auth/me?active=1' : '/auth/me'),
   login: body => request('/auth/login', { method: 'POST', json: body }),
   register: body => request('/auth/register', { method: 'POST', json: body }),
   logout: () => request('/auth/logout', { method: 'POST' }),
@@ -18,6 +19,10 @@ export const auth = {
   changePassword: (current_password, new_password) => request('/auth/password', { method: 'PUT', json: { current_password, new_password } }),
   forgot: email => request('/auth/forgot', { method: 'POST', json: { email } }),
   reset: (token, new_password) => request('/auth/reset', { method: 'POST', json: { token, new_password } }),
+  loginOtp: body => request('/auth/login/otp', { method: 'POST', json: body }),
+  totpSetup: password => request('/auth/totp/setup', { method: 'POST', json: { password } }),
+  totpEnable: code => request('/auth/totp/enable', { method: 'POST', json: { code } }),
+  totpDisable: password => request('/auth/totp/disable', { method: 'POST', json: { password } }),
 }
 
 export const devices = {

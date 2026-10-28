@@ -77,6 +77,11 @@ export default function AppLayout() {
             {user.pin_locked ? 'Your payment PIN is locked.' : 'Set a payment PIN: you’ll need it every time you release a payment.'} <Link to="/app/security">{user.pin_locked ? 'Set a new PIN' : 'Set PIN'}</Link>
           </div>
         )}
+        {user.has_pin && !user.pin_locked && !user.has_totp && location.pathname !== '/app/security' && (
+          <div className="alert alert-info notice-bar">
+            Protect your account: turn on sign-in codes, so a stolen password alone can’t open TriGuard. <Link to="/app/security">Turn on</Link>
+          </div>
+        )}
         <Outlet />
         </>}
       </main>

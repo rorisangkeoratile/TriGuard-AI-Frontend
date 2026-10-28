@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { demoRequest, demoSession, resetDemo } from './demo.js'
+import { codeAt } from '../lib/totp.js'
 
 const post = (path, json) => demoRequest(path, 'POST', json)
 const get = path => demoRequest(path, 'GET')
@@ -123,6 +124,58 @@ describe('demo mode API', () => {
     expect(check.signals.map(s => s.id)).toEqual(expect.arrayContaining(['meeting_link', 'authority', 'secrecy']))
     expect(check.callback_status).toBe('pending') // the payment stays on hold until a call-back
   })
+
+  it('asks for a sign-in code after the password once sign-in codes are on', async () => {
+    await owner()
+    const { secret } = await post('/auth/totp/setup', { password: 'strong-pass-1' })
+    const step = Math.floor(Date.now() / 30000)
+    expect(await post('/auth/totp/enable', { code: await codeAt(secret, step) })).toMatchObject({ has_totp: true })
+    await post('/auth/logout')
+
+    const login = { email: 'thandi@acme.co.za', password: 'strong-pass-1', device_key: 'key-thandi@acme.co.za', device_name: 'Till 1' }
+    const first = await post('/auth/login', login)
+    expect(first.step).toBe('otp') // the right password alone isn't enough
+    await expect(get('/auth/me')).rejects.toMatchObject({ status: 401 })
+    await expect(post('/auth/login/otp', { challenge: first.challenge, code: '000000' })).rejects.toMatchObject({ status: 401 })
+    // The code used to turn it on can't be used again.
+    await expect(post('/auth/login/otp', { challenge: first.challenge, code: await codeAt(secret, step) })).rejects.toMatchObject({ status: 401 })
+    const done = await post('/auth/login/otp', { challenge: first.challenge, code: await codeAt(secret, step + 1) })
+    expect(done.step).toBe('done')
+    expect(await get('/auth/me')).toMatchObject({ email: 'thandi@acme.co.za', has_totp: true })
+  })
+
+  it('cancels the sign-in after 5 wrong codes', async () => {
+    await owner()
+    const { secret } = await post('/auth/totp/setup', { password: 'strong-pass-1' })
+    await post('/auth/totp/enable', { code: await codeAt(secret, Math.floor(Date.now() / 30000)) })
+    await post('/auth/logout')
+    const { challenge } = await post('/auth/login', { email: 'thandi@acme.co.za', password: 'strong-pass-1', device_key: 'k', device_name: 'Till 1' })
+    for (let i = 0; i < 4; i++) await expect(post('/auth/login/otp', { challenge, code: '000000' })).rejects.toMatchObject({ status: 401 })
+    await expect(post('/auth/login/otp', { challenge, code: '000000' })).rejects.toMatchObject({ status: 429 })
+    await expect(post('/auth/login/otp', { challenge, code: '000000' })).rejects.toMatchObject({ status: 401 }) // gone
+  })
+
+  it('signs out after 15 minutes without activity, and after 8 hours in any case', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      await owner()
+      vi.setSystemTime(Date.now() + 14 * 60000)
+      await get('/auth/me?active=1') // the person used the page: still signed in, and the idle clock restarts
+      vi.setSystemTime(Date.now() + 14 * 60000)
+      await get('/auth/me') // a background re-check doesn't count as activity
+      vi.setSystemTime(Date.now() + 2 * 60000)
+      await expect(get('/auth/me')).rejects.toMatchObject({ status: 401, message: expect.stringMatching(/without activity/) })
+
+      await signIn('/auth/login', { email: 'thandi@acme.co.za', password: 'strong-pass-1' })
+      // Steady use every 14 minutes keeps the session alive for 7 h 56 min (34 x 14)...
+      for (let i = 0; i < 34; i++) { vi.setSystemTime(Date.now() + 14 * 60000); await get('/auth/me?active=1') }
+      // ...but not past 8 hours since logging in.
+      vi.setSystemTime(Date.now() + 14 * 60000)
+      await expect(get('/auth/me?active=1')).rejects.toMatchObject({ status: 401, message: expect.stringMatching(/8 hours/) })
+    } finally {
+      vi.useRealTimers()
+    }
+  }, 30000)
 
   it('never releases a payment without a confirmed call-back', async () => {
     await owner()

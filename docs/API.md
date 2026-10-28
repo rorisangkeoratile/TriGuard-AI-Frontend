@@ -68,6 +68,10 @@ The React app calls these endpoints. All paths start with `/api`. In development
 |---|---|---|
 | `POST /auth/register` | `{full_name, company, email, password, accept_terms: true, device_key, device_name}` | `201` **LoginResult** (below). Creates the store (`company` is the store name); the user is its `owner`. `409` if the email exists. |
 | `POST /auth/login` | `{email, password, device_key, device_name}` | **LoginResult**. `401` on a wrong email or password (same message for both). `403` if this device is blocked. `429` after repeated failures. |
+| `POST /auth/login/otp` | `{challenge, code}` | **LoginResult**. The second step when the account has sign-in codes on (see below). `401` wrong code (say how many tries are left) or expired challenge; `429` after 5 wrong codes, and the challenge is deleted. |
+| `POST /auth/totp/setup` | `{password}` | `{secret, otpauth_url}`: a new TOTP secret (RFC 6238, SHA-1, 6 digits, 30 s), kept as *pending* until enabled. `403` wrong password. |
+| `POST /auth/totp/enable` | `{code}` | Me with `has_totp: true`. `422` if the code doesn't match the pending secret, so a mis-scanned app can't lock the user out. `409` if no set-up was started. |
+| `POST /auth/totp/disable` | `{password}` | Me with `has_totp: false`. `403` wrong password. |
 | `PUT /auth/pin` | `{pin, password}` | Me. Sets or changes the payment PIN, and unlocks a locked one. `403` wrong password, `422` weak PIN. |
 | `PUT /auth/password` | `{current_password, new_password}` | Me. `403` wrong current password, `422` weak or unchanged. Ends the user's other sessions. Clears `must_change_password`. |
 | `POST /auth/forgot` | `{email}` | Always `{"sent": true}`, whether or not the email exists. For an active **owner**, email a one-time reset link (`/reset-password?token=…`), valid 30 minutes; store only a hash of the token. Staff get no link: their owner resets them. Rate-limit it. |
@@ -81,6 +85,10 @@ The React app calls these endpoints. All paths start with `/api`. In development
 
 Password rules the frontend already checks: at least 10 characters, not only letters or only digits.
 
+**Sign-in codes (two-step sign-in):** when the user has TOTP on, a correct password returns `{"step": "otp", "challenge": "<random token>"}` and **no session**. The challenge lives 5 minutes and is bound to that user and device. `POST /auth/login/otp` checks the code against the current 30-second step ±1, refuses any step at or before the last one used (no replays), then continues exactly like a normal login (device approval and so on). Store the TOTP secret encrypted at rest; it can't be hashed because the server needs it to compute codes. `PUT /team/{id}/password` also turns off that staff member's sign-in codes (lost phone), and they set them up again. Use an authenticator app, not SMS: SMS codes can be stolen with a SIM swap.
+
+**Session timeouts:** end a session after **15 minutes without activity** and **8 hours after login** in any case, and return `401` with the reason in `detail` ("You were signed out after 15 minutes without activity…" / "Your session ended after 8 hours…"). Any request counts as activity except the app's background re-check of `GET /auth/me`, which it sends every few seconds; it adds `?active=1` only when the person used the page since the last check. Use an HttpOnly, Secure, SameSite=Strict session cookie (never readable by JavaScript), and a session cookie with no expiry date, so closing the browser ends it.
+
 **Temporary passwords:** while `must_change_password` is true, every endpoint except `GET /auth/me`, `PUT /auth/password` and `POST /auth/logout` returns `403` ("Change your temporary password first."). The frontend shows only the change-password screen until then.
 
 ### Approved devices and stolen devices
@@ -90,9 +98,10 @@ Each browser creates a random `device_key` (32 bytes, base64url) once and sends 
 // LoginResult
 { "step": "done", "user": Me }           // approved device: set the session cookie
 { "step": "pending", "device": Device }  // new or unapproved device: NO session; the owner must approve it first
+{ "step": "otp", "challenge": "…" }      // sign-in codes on: NO session yet; send the code to POST /auth/login/otp
 
 // Me = User plus:
-{ "device": Device, "has_pin": true, "pin_locked": false, "pending_devices": 2, "must_change_password": false }   // pending_devices: owners only, else 0
+{ "device": Device, "has_pin": true, "has_totp": true, "pin_locked": false, "pending_devices": 2, "must_change_password": false }   // pending_devices: owners only, else 0
 
 // Device
 { "id": 9, "name": "Chrome on Windows", "status": "approved", "user_id": 4, "user_name": "Lebo Molefe",

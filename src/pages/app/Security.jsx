@@ -10,6 +10,100 @@ import ChangePassword from './ChangePassword.jsx'
 
 const STATUS_CLASS = { approved: 'cb-confirmed', pending: 'cb-pending', blocked: 'cb-denied' }
 
+// Two-step sign-in with an authenticator app (Microsoft or Google Authenticator). A code from the app is needed
+// after the password, so a stolen or guessed password alone can't open TriGuard. No SMS: a SIM swap can't steal it.
+function TotpCard() {
+  const { user, refresh } = useAuth()
+  const [password, setPassword] = useState('')
+  const [setup, setSetup] = useState(null) // { secret, qr }
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [done, setDone] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function run(fn) {
+    setBusy(true)
+    setError('')
+    setDone('')
+    try { await fn() } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const start = e => {
+    e.preventDefault()
+    run(async () => {
+      const { secret, otpauth_url } = await auth.totpSetup(password)
+      const QRCode = await import('qrcode')
+      setSetup({ secret, qr: await QRCode.toDataURL(otpauth_url, { margin: 1, width: 200 }) })
+      setPassword('')
+    })
+  }
+  const enable = e => {
+    e.preventDefault()
+    run(async () => {
+      await auth.totpEnable(code.trim())
+      setSetup(null)
+      setCode('')
+      setDone('Sign-in codes are on. Next time you log in, TriGuard will ask for a code from your app.')
+      await refresh()
+    })
+  }
+  const disable = e => {
+    e.preventDefault()
+    if (!window.confirm('Turn off sign-in codes? Your password alone will then open TriGuard.')) return
+    run(async () => {
+      await auth.totpDisable(password)
+      setPassword('')
+      setDone('Sign-in codes are off.')
+      await refresh()
+    })
+  }
+
+  const passwordField = (
+    <Field id="totp-password" label="Your account password">
+      <input id="totp-password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
+    </Field>
+  )
+
+  return (
+    <section className="card form">
+      <div className="card-head">
+        <h2>Sign-in codes</h2>
+        <span className={`badge ${user.has_totp ? 'cb-confirmed' : 'cb-pending'}`}>{user.has_totp ? 'On' : 'Off'}</span>
+      </div>
+      <p className="small muted">
+        After your password, TriGuard asks for a 6-digit code from Microsoft Authenticator or Google Authenticator on
+        your phone. A stolen password alone can’t open your account, and because there’s no SMS, a SIM swap can’t steal the code.
+      </p>
+      <Alert>{error}</Alert>
+      <Alert kind="success">{done}</Alert>
+      {user.has_totp ? (
+        <form onSubmit={disable} noValidate className="form">
+          {passwordField}
+          <button className="btn btn-text-danger btn-sm" disabled={busy}>Turn off sign-in codes</button>
+        </form>
+      ) : setup ? (
+        <form onSubmit={enable} noValidate className="form">
+          <ol className="small">
+            <li>In your authenticator app, add an account (in Microsoft Authenticator: <b>+</b> › <b>Other account</b>) and scan this code.</li>
+            <li>Type the 6-digit code the app shows for TriGuard AI.</li>
+          </ol>
+          <img src={setup.qr} width="200" height="200" alt="QR code to add TriGuard AI to your authenticator app" />
+          <p className="small muted">Can’t scan? Enter this key instead: <code>{setup.secret.match(/.{1,4}/g).join(' ')}</code></p>
+          <Field id="totp-code" label="Code from the app">
+            <input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
+          </Field>
+          <button className="btn btn-primary" disabled={busy}>{busy ? 'Checking…' : 'Turn on'}</button>
+        </form>
+      ) : (
+        <form onSubmit={start} noValidate className="form">
+          {passwordField}
+          <button className="btn btn-primary" disabled={busy}>{busy ? 'Starting…' : 'Set up sign-in codes'}</button>
+        </form>
+      )}
+    </section>
+  )
+}
+
 // Accounts, contacts and checks are kept in this browser. Anyone can erase them (POPIA: the right to deletion).
 function BrowserDataCard() {
   const { logout } = useAuth()
@@ -83,6 +177,7 @@ export default function Security() {
             ) : <p className="muted">No device information.</p>}
             <p className="small muted">This browser is recognised by a random device key. If it’s lost or stolen, the store owner can block it.</p>
           </section>
+          <TotpCard />
           <PinCard />
           <ChangePassword />
           {DEMO_MODE && <BrowserDataCard />}

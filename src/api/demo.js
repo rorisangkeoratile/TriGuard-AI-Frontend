@@ -4,6 +4,7 @@
 import { ApiError } from './client.js'
 import { passwordProblem, pinProblem } from '../lib/format.js'
 import { toB64url } from '../lib/device.js'
+import { newSecret, otpauthUrl, verifyCode } from '../lib/totp.js'
 
 // POPIA: passwords and PINs are kept only as salted one-way hashes, and no bank details or payment history are stored.
 // Older versions of this store held bank account details, so they are deleted on load.
@@ -57,6 +58,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms))
 // ---------- sessions and approved devices ----------
 const PIN_TRIES = 5
 const RESET_MINUTES = 30
+const OTP_TRIES = 5 // wrong sign-in codes before the login attempt is cancelled
+const OTP_MINUTES = 5 // time to type the code after the password
+// Sessions (OWASP session management): signed out after 15 minutes without activity, so an unattended till or
+// office computer can't be used to release payments, and after 8 hours (one shift) even when active.
+export const IDLE_MINUTES = 15
+export const MAX_SESSION_HOURS = 8
 
 async function setPassword(user, password) {
   user.password = await hash(`password:${user.email}:${password}`)
@@ -66,6 +73,8 @@ const SIGNED_OUT = {
   device_blocked: 'You were signed out because this device was blocked. If it was lost or stolen, it can’t open TriGuard any more.',
   removed: 'You were signed out because your account was removed from this store.',
   password_changed: 'You were signed out because your password was changed. Log in with the new password.',
+  idle: `You were signed out after ${IDLE_MINUTES} minutes without activity, so nobody can use TriGuard on an unattended computer. Log in again.`,
+  expired: `Your session ended after ${MAX_SESSION_HOURS} hours. Log in again to carry on.`,
 }
 
 const currentSession = () => { const t = tabToken(); return t ? db.sessions.find(s => s.token === t) : null }
@@ -79,6 +88,10 @@ function endSession(session) {
 // A session only works while its device is approved, so blocking a device signs it out.
 function me() {
   const s = currentSession()
+  if (s && !s.revoked) {
+    if (Date.now() - Date.parse(s.created_at) > MAX_SESSION_HOURS * 3600000) s.revoked = 'expired'
+    else if (Date.now() - (s.last_active || Date.parse(s.created_at)) > IDLE_MINUTES * 60000) s.revoked = 'idle'
+  }
   if (s?.revoked) { endSession(s); fail(401, SIGNED_OUT[s.revoked]) }
   const user = s && db.users.find(u => u.id === s.user_id && u.active)
   if (!user) fail(401, 'Please log in.')
@@ -117,7 +130,7 @@ async function signIn(user, deviceKey, deviceName) {
 
   const old = currentSession()
   if (old) db.sessions = db.sessions.filter(s => s !== old)
-  const session = { token: randomToken(), user_id: user.id, device_id: device.id, created_at: now() }
+  const session = { token: randomToken(), user_id: user.id, device_id: device.id, created_at: now(), last_active: Date.now() }
   db.sessions.push(session)
   setTab(session.token)
   device.last_used_at = now()
@@ -136,6 +149,7 @@ function meOut(u) {
     ...userOut(u),
     device: device ? deviceOut(device) : null,
     has_pin: !!u.pin,
+    has_totp: !!u.totp,
     pin_locked: (u.pin_failures || 0) >= PIN_TRIES,
     pending_devices: u.role === 'owner' ? db.devices.filter(d => d.org_id === u.org_id && d.status === 'pending').length : 0,
     must_change_password: !!u.must_change_password,
@@ -360,10 +374,42 @@ export async function demoRequest(path, method, json, form) {
       db.orgs.push(org)
       db.users.push(user)
     }
+    // With sign-in codes on, the right password isn't enough: the code from the authenticator app comes next.
+    if (user.totp) {
+      db.challenges = (db.challenges || []).filter(c => c.expires > Date.now() && c.user_id !== user.id)
+      const challenge = { token: randomToken(), user_id: user.id, device_key: body.device_key, device_name: body.device_name, tries: 0, expires: Date.now() + OTP_MINUTES * 60000 }
+      db.challenges.push(challenge)
+      save()
+      return { step: 'otp', challenge: challenge.token }
+    }
     return signIn(user, body.device_key, body.device_name)
   }
+  if (route === '/auth/login/otp' && method === 'POST') {
+    const challenge = (db.challenges || []).find(c => c.token === body.challenge && c.expires > Date.now())
+    const user = challenge && db.users.find(u => u.id === challenge.user_id && u.active)
+    if (!challenge || !user?.totp) fail(401, 'This sign-in has expired. Log in again.')
+    const step = await verifyCode(user.totp.secret, String(body.code || '').trim(), user.totp.last_step)
+    if (step === null) {
+      challenge.tries += 1
+      if (challenge.tries >= OTP_TRIES) {
+        db.challenges = db.challenges.filter(c => c !== challenge)
+        save()
+        fail(429, 'Too many wrong codes. Log in again with your password.')
+      }
+      save()
+      fail(401, `That code isn’t right. Check the TriGuard AI code in your authenticator app (${OTP_TRIES - challenge.tries} ${OTP_TRIES - challenge.tries === 1 ? 'try' : 'tries'} left).`)
+    }
+    user.totp.last_step = step // each code works once
+    db.challenges = db.challenges.filter(c => c !== challenge)
+    return signIn(user, challenge.device_key, challenge.device_name)
+  }
   if (route === '/auth/logout') { endSession(currentSession()); return null }
-  if (route === '/auth/me') return meOut(me())
+  if (route === '/auth/me') {
+    const u = me()
+    // The app re-checks /auth/me every few seconds; only count it as activity when the person actually used the page.
+    if (new URLSearchParams(query).get('active') === '1') { currentSession().last_active = Date.now(); save() }
+    return meOut(u)
+  }
 
   // Forgotten password. Store owners get a one-time reset link by email; staff ask their store owner.
   // The answer is the same whether or not the email exists, so it can't be used to find accounts.
@@ -393,6 +439,8 @@ export async function demoRequest(path, method, json, form) {
 
   const user = me()
   const orgId = user.org_id
+  currentSession().last_active = Date.now() // any real action counts as activity
+  save()
 
   // Everyone can change their own password. Staff must replace the temporary one the owner gave them first.
   if (route === '/auth/password' && method === 'PUT') {
@@ -418,6 +466,33 @@ export async function demoRequest(path, method, json, form) {
     user.pin_failures = 0
     save()
     return meOut(user)
+  }
+
+  // Sign-in codes (two-step sign-in). Turning them on or off needs the password; turning on also needs a first code,
+  // which proves the authenticator app was set up correctly before the account depends on it.
+  if (parts[0] === 'auth' && parts[1] === 'totp' && method === 'POST') {
+    const passwordOk = async () => await hash(`password:${user.email}:${body.password || ''}`) === user.password
+    if (parts[2] === 'setup') {
+      if (!(await passwordOk())) fail(403, 'That password is wrong.')
+      user.totp_pending = newSecret()
+      save()
+      return { secret: user.totp_pending, otpauth_url: otpauthUrl(user.totp_pending, user.email) }
+    }
+    if (parts[2] === 'enable') {
+      if (!user.totp_pending) fail(409, 'Start the set-up again.')
+      const step = await verifyCode(user.totp_pending, String(body.code || '').trim())
+      if (step === null) fail(422, 'That code isn’t right. Type the 6-digit code shown for TriGuard AI in your authenticator app.')
+      user.totp = { secret: user.totp_pending, last_step: step, enabled_at: now() }
+      user.totp_pending = null
+      save()
+      return meOut(user)
+    }
+    if (parts[2] === 'disable') {
+      if (!(await passwordOk())) fail(403, 'That password is wrong.')
+      user.totp = null
+      save()
+      return meOut(user)
+    }
   }
 
   if (parts[0] === 'devices') {
@@ -471,6 +546,7 @@ export async function demoRequest(path, method, json, form) {
       if (problem) fail(422, problem)
       await setPassword(staff, body.password)
       staff.must_change_password = true
+      staff.totp = null // lost phone: they set up sign-in codes again on the new one
       for (const s of db.sessions) if (s.user_id === staff.id) s.revoked = 'password_changed'
       save()
       return userOut(staff)
