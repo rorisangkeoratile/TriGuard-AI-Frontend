@@ -172,8 +172,31 @@ const PAYMENT_RULES = [
 
 const readAnswer = v => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : null)
 
-function assess({ text, contact, senderNumber, answers }) {
-  const signals = []
+// Voice notes are the one check demo mode can't do in the browser: the AI-voice model and transcription run on the
+// TriGuard backend (POST /api/v1/voice/analyze, through Vite's /api proxy). The audio is analysed in memory there
+// and not stored. Returns null when the backend isn't running, and the check says so.
+// The deployed site has no Vite proxy, so it calls the backend at VITE_API_URL directly (allowed by its CORS list).
+const VOICE_API = import.meta.env.PROD ? (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') : ''
+async function serverVoice(file) {
+  if (!(file instanceof Blob)) return null
+  const form = new FormData()
+  form.append('file', file)
+  form.append('language', 'en')
+  try {
+    const res = await fetch(VOICE_API + '/api/v1/voice/analyze', { method: 'POST', body: form })
+    return res.ok ? await res.json() : null
+  } catch { return null }
+}
+
+function voiceSignal(score) {
+  const pct = Math.round(score * 100)
+  if (score >= 0.7) return { id: 'voice_clone', points: 45, guard: 'voice', text: `The voice shows strong signs of AI cloning (${pct}%).` }
+  if (score >= 0.4) return { id: 'voice_clone', points: 20, guard: 'voice', text: `The voice shows some signs of AI generation (${pct}%).` }
+  return { id: 'voice_clone', points: 0, guard: 'voice', text: `The AI-voice detector found no strong signs of cloning (${pct}%). New cloning tools can still slip through.` }
+}
+
+function assess({ text, contact, senderNumber, answers, voiceScore = null }) {
+  const signals = typeof voiceScore === 'number' ? [voiceSignal(voiceScore)] : []
   if (contact && senderNumber) {
     signals.push(senderNumber !== contact.phone
       ? { id: 'number_mismatch', points: 20, guard: 'words', text: `It came from ${senderNumber}, not ${contact.name}’s saved number.` }
@@ -194,7 +217,8 @@ function assess({ text, contact, senderNumber, answers }) {
   let score = Math.min(100, signals.reduce((s, x) => s + x.points, 0))
   const ids = new Set(signals.map(s => s.id))
   // Some combinations are High on their own.
-  if (ids.has('credentials') || (ids.has('new_payee_or_bank_change') && ids.has('skip_approval'))) score = Math.max(score, 60)
+  const cloned = signals.some(s => s.id === 'voice_clone' && s.points >= 45)
+  if (cloned || ids.has('credentials') || (ids.has('new_payee_or_bank_change') && ids.has('skip_approval'))) score = Math.max(score, 60)
   signals.sort((a, b) => b.points - a.points)
   return { signals, score, level: score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low', payment }
 }
@@ -231,23 +255,37 @@ function summaryOut(c) {
   }
 }
 
-function createCheck(user, kind, fields) {
+function createCheck(user, kind, fields, server = null) {
   const contactId = fields.claimed_contact_id ? Number(fields.claimed_contact_id) : null
   const contact = contactId ? db.contacts.find(x => x.id === contactId && x.org_id === user.org_id) : null
   if (contactId && !contact) fail(422, 'That trusted contact doesn’t exist.')
-  const text = kind === 'text' ? String(fields.text || '').trim() : ''
+  const transcript = (server?.transcript || '').trim()
+  const text = kind === 'text' ? String(fields.text || '').trim() : transcript
   const answers = Object.fromEntries(PAYMENT_RULES.map(([key]) => [key, readAnswer(fields[key])]))
+  const model = server?.model?.available ? server.model : null
+  const voiceScore = typeof model?.synthetic_probability === 'number' ? model.synthetic_probability : null
 
-  const result = assess({ text, contact, senderNumber: fields.sender_number || '', answers })
+  const result = assess({ text, contact, senderNumber: fields.sender_number || '', answers, voiceScore })
+  // The server also reads the transcript in all 11 languages; use that when the English rules found nothing.
+  const tr = server?.transcript_risk
+  if (tr && ['high', 'critical'].includes(tr.risk_level) && !result.signals.some(s => s.guard === 'words' && s.points > 0)) {
+    result.signals.push({ id: 'ai_words', points: 30, guard: 'words', text: tr.headline })
+    result.score = Math.min(100, result.score + 30)
+    result.level = result.score >= 60 ? 'high' : result.score >= 30 ? 'medium' : 'low'
+  }
   const needsServer = 'Needs the TriGuard server (demo mode).'
   const guards = kind === 'voice'
     ? {
-        voice_clone: status('unavailable', `AI-voice detection (AASIST): ${needsServer}`),
+        voice_clone: voiceScore !== null
+          ? status('ran', `AI-voice detector (wav2vec2 deepfake model) on the TriGuard server: ${Math.round(voiceScore * 100)}% likely AI. The audio wasn’t stored.`)
+          : status('unavailable', `AI-voice detection: ${server?.model?.note || needsServer}`),
         voice_match: contact?.voiceprint
           ? status('unavailable', `Voiceprint match (ECAPA): ${needsServer}`)
           : status('skipped', 'No saved voiceprint for the person it claims to be from.'),
-        transcription: status('unavailable', `Transcription (Whisper): ${needsServer} The words in the voice note weren’t checked.`),
-        words: status('ran', 'Checked the sender details.'),
+        transcription: transcript
+          ? status('ran', `Transcribed on the TriGuard server${server.transcript_engine ? ` (${server.transcript_engine})` : ''}, then checked for the payment-fraud script.`)
+          : status('unavailable', `Transcription: ${server ? 'No speech could be transcribed.' : needsServer} The words in the voice note weren’t checked.`),
+        words: status('ran', transcript ? 'Checked the sender details and the words in the voice note.' : 'Checked the sender details.'),
         payment: result.payment,
         file_safety: status('unavailable', `Malware scan (ClamAV): ${needsServer}`),
       }
@@ -260,11 +298,13 @@ function createCheck(user, kind, fields) {
   const check = {
     id: nextId(), org_id: user.org_id, created_by: user.id, kind,
     claimed_contact_id: contact ? contact.id : null,
-    sender_number: fields.sender_number || '', content: text, language: text ? 'Not detected in demo mode' : '',
+    sender_number: fields.sender_number || '', content: text,
+    language: server?.audio_language || (text ? 'Not detected in demo mode' : ''),
     payment_answers: answers,
     level: result.level, score: result.score, signals: result.signals, guards,
-    voice_score: null, speaker_similarity: null,
-    explanation: explanation(result.level, result.signals, who) + (kind === 'voice' ? ' The voice itself could not be analysed in demo mode.' : ''),
+    voice_score: voiceScore, speaker_similarity: null,
+    explanation: explanation(result.level, result.signals, who)
+      + (kind === 'voice' && voiceScore === null ? ' The voice itself could not be analysed: the TriGuard server isn’t running.' : ''),
     callback_status: 'pending', callback_note: '', callback_at: null, callback_by: null,
     decision: 'none', decided_at: null, decided_by: null, created_at: now(),
   }
@@ -455,7 +495,11 @@ export async function demoRequest(path, method, json, form) {
   }
 
   if (parts[0] === 'checks') {
-    if (route === '/checks/voice' && method === 'POST') return createCheck(user, 'voice', body)
+    if (route === '/checks/voice' && method === 'POST') {
+      const server = await serverVoice(body.file)
+      db = load() // the server check takes a while; pick up changes made meanwhile
+      return createCheck(user, 'voice', body, server)
+    }
     if (route === '/checks/text' && method === 'POST') return createCheck(user, 'text', body)
     if (parts.length === 1 && method === 'GET') {
       const q = new URLSearchParams(query)
