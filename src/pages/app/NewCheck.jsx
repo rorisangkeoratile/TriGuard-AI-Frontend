@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { checks, contacts as contactsApi } from '../../api/index.js'
-import { Alert, Field } from '../../components/ui.jsx'
+import { Alert, Field, Spinner } from '../../components/ui.jsx'
 import { AUDIO_ACCEPT, MAX_UPLOAD_MB, PAYMENT_QUESTIONS, isPhone, normalisePhone } from '../../lib/format.js'
+import { takeOutlookEmail } from '../../lib/outlook.js'
 import { useLoad } from '../../lib/useLoad.js'
 
 // POPIA section 10 (minimality): the payment check asks three yes/no questions instead of collecting
@@ -22,21 +23,21 @@ export default function NewCheck() {
   const [errors, setErrors] = useState({})
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [fromOutlook, setFromOutlook] = useState(false)
+  const [holding, setHolding] = useState(false)
   const abortRef = useRef(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  // "Put the payment on hold" in the Outlook add-in opens this page with the email in the URL fragment (#), which
-  // never reaches the web server. Load it into a text check, then clear it from the address bar.
+  // An email sent from the Outlook add-in ("Put the payment on hold") becomes a check straight away, and its page
+  // shows the hold: no release without a confirmed call-back and the payment PIN.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.slice(1))
-    if (params.get('from') !== 'outlook' || !params.get('text')) return
-    setKind('text')
-    setForm(f => ({ ...f, text: params.get('text') }))
-    setFromOutlook(true)
-    window.history.replaceState(null, '', window.location.pathname)
-  }, [])
+    const email = takeOutlookEmail()
+    if (!email) return
+    setHolding(true)
+    checks.text({ text: email, source: 'outlook' })
+      .then(result => navigate(`/app/checks/${result.id}`, { replace: true }))
+      .catch(err => { setHolding(false); setKind('text'); setForm(f => ({ ...f, text: email })); setError(err.message) })
+  }, [navigate])
 
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
@@ -85,6 +86,8 @@ export default function NewCheck() {
 
   const list = people.data || []
 
+  if (holding) return <div className="page"><Spinner label="Checking the email from Outlook and putting the payment on hold…" /></div>
+
   return (
     <div className="page page-narrow">
       <div className="page-head">
@@ -95,12 +98,6 @@ export default function NewCheck() {
       </div>
 
       <Alert>{error}</Alert>
-      {fromOutlook && (
-        <p className="card">
-          <b>Email from Outlook.</b> Answer the payment questions and check it. The payment stays on hold until someone
-          calls the person back on their saved number and enters your payment PIN.
-        </p>
-      )}
 
       <form className="card form" onSubmit={submit} noValidate>
         <div className="seg" role="tablist" aria-label="What did you receive?">

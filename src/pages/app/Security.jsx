@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { auth, devices } from '../../api/index.js'
 import { DEMO_MODE } from '../../api/client.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
@@ -8,6 +9,28 @@ import { useLoad } from '../../lib/useLoad.js'
 import ChangePassword from './ChangePassword.jsx'
 
 const STATUS_CLASS = { approved: 'cb-confirmed', pending: 'cb-pending', blocked: 'cb-denied' }
+
+// Accounts, contacts and checks are kept in this browser. Anyone can erase them (POPIA: the right to deletion).
+function BrowserDataCard() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function erase() {
+    if (!window.confirm('Delete all TriGuard data stored in this browser? Every account, contact and check here will be erased.')) return
+    const { resetDemo } = await import('../../api/demo.js')
+    navigate('/', { replace: true })
+    resetDemo()
+    await logout()
+  }
+
+  return (
+    <section className="card">
+      <h2>Data in this browser</h2>
+      <p className="small muted">Your accounts, trusted contacts and checks are stored in this browser only.</p>
+      <button className="btn btn-text-danger btn-sm" type="button" onClick={erase}>Delete all data in this browser</button>
+    </section>
+  )
+}
 
 export default function Security() {
   const { user, refresh } = useAuth()
@@ -62,6 +85,7 @@ export default function Security() {
           </section>
           <PinCard />
           <ChangePassword />
+          {DEMO_MODE && <BrowserDataCard />}
         </div>
 
         <section className="card">

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { DEMO_MODE } from '../../api/client.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import { Logo } from '../../components/ui.jsx'
 import ChangePassword from './ChangePassword.jsx'
@@ -42,14 +41,6 @@ export default function AppLayout() {
   }
 
   // Erases every account, contact and check stored by demo mode in this browser.
-  async function deleteDemoData() {
-    if (!window.confirm('Delete all demo data stored in this browser? Every demo account, contact and check will be erased.')) return
-    const { resetDemo } = await import('../../api/demo.js')
-    navigate('/', { replace: true })
-    resetDemo()
-    await logout()
-  }
-
   return (
     <div className="shell">
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
@@ -73,12 +64,6 @@ export default function AppLayout() {
         </div>
       </aside>
       <main className="main">
-        {DEMO_MODE && (
-          <div className="demo-bar" role="note">
-            <b>Demo mode.</b> Running without the TriGuard server: data stays in this browser, text checks run in the browser, and voice analysis is not available.
-            <button className="link-btn" onClick={deleteDemoData}>Delete demo data</button>
-          </div>
-        )}
         {user.must_change_password ? (
           <div className="page page-narrow"><ChangePassword forced /></div>
         ) : <>

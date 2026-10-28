@@ -116,7 +116,9 @@ describe('demo mode API', () => {
     const check = await post('/checks/text', {
       text: 'From the CFO: process the confidential transfer today. Let’s confirm on a Teams call: https://teams.microsoft.com/l/meetup-join/abc',
       skip_approval: true,
+      source: 'outlook',
     })
+    expect(check.source).toBe('outlook')
     expect(check.level).toBe('high')
     expect(check.signals.map(s => s.id)).toEqual(expect.arrayContaining(['meeting_link', 'authority', 'secrecy']))
     expect(check.callback_status).toBe('pending') // the payment stays on hold until a call-back

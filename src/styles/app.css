@@ -319,8 +319,6 @@ a:has(> .logo) { text-decoration: none; }
 .ans-no { color: var(--low); }
 .ans-none { color: var(--muted); font-weight: 500; }
 
-.demo-bar { background: var(--medium-bg); color: #7a2e0e; border-bottom: 1px solid #fedf89; padding: 8px 32px; font-size: .875rem; }
-.demo-bar .link-btn { margin-left: 8px; color: #7a2e0e; }
 .home-footer a { color: var(--on-navy); }
 .legal { min-height: 100vh; background: var(--surface); }
 .legal-head { border-bottom: 1px solid var(--line); padding: 16px 24px; }
@@ -328,7 +326,6 @@ a:has(> .logo) { text-decoration: none; }
 .legal-body h2 { margin-top: 28px; }
 .legal-body ul { padding-left: 20px; display: grid; gap: 8px; }
 .legal-back { margin-top: 32px; }
-.demo-note { background: var(--medium-bg); color: #7a2e0e; border-radius: 8px; padding: 8px 12px; font-size: .85rem; }
 
 /* ---------- devices, PIN ---------- */
 .stack { display: grid; gap: 20px; }
@@ -367,7 +364,6 @@ a:has(> .logo) { text-decoration: none; }
   .sidebar.open .side-nav { display: grid; padding-top: 12px; }
   .sidebar.open .side-user { display: grid; }
   .page { padding: 20px 16px 48px; }
-  .demo-bar { padding: 8px 16px; }
   .notice-bar { margin: 12px 16px 0; }
   .page-head { flex-direction: column; }
   h1 { font-size: 1.6rem; }
@@ -385,3 +381,7 @@ a:has(> .logo) { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation-duration: .001ms !important; }
 }
+
+/* A risky check keeps the payment on hold until a call-back and PIN release it. */
+.hold-banner { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 16px 0; padding: 14px 18px; border-radius: 12px; background: var(--high-bg); border: 2px solid #f04438; color: #7a271a; }
+.hold-banner b { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .04em; color: #b42318; }

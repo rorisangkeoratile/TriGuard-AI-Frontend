@@ -39,8 +39,8 @@ export default function Privacy() {
         <h2>Your rights</h2>
         <p>You can ask to see the personal information we hold about you, have it corrected, or have it deleted, and you can object to it being processed. Contact the Information Officer above. If you’re not satisfied, you can complain to the Information Regulator at <a href="https://inforegulator.org.za" target="_blank" rel="noreferrer">inforegulator.org.za</a>.</p>
 
-        <h2>Demo mode</h2>
-        <p>In demo mode, everything you enter stays in this browser only and is never sent anywhere. You can erase it with “Delete demo data” at the top of the dashboard.</p>
+        <h2>Data in this browser</h2>
+        <p>Your account, trusted contacts and checks are stored in this browser only. Voice notes you check are sent to the TriGuard server, analysed in memory and not stored. You can erase everything with “Delete all data in this browser” under Security.</p>
 
         <p className="legal-back"><Link to="/">‹ Back to TriGuard</Link></p>
       </main>

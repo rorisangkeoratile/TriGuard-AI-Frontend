@@ -312,6 +312,7 @@ function createCheck(user, kind, fields, server = null) {
   const check = {
     id: nextId(), org_id: user.org_id, created_by: user.id, kind,
     claimed_contact_id: contact ? contact.id : null,
+    source: fields.source === 'outlook' ? 'outlook' : null,
     sender_number: fields.sender_number || '', content: text,
     content_english: server?.transcript_english || '',
     language: server ? LANGUAGE_NAMES[server.audio_language] || server.audio_language || '' : (text ? 'Not detected in demo mode' : ''),

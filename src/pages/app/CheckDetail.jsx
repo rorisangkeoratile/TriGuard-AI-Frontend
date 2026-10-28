@@ -33,6 +33,7 @@ export default function CheckDetail() {
   const reasons = check.signals.filter(s => s.points > 0)
   const notes = check.signals.filter(s => s.points <= 0)
   const who = check.claimed_contact
+  const fromEmail = check.source === 'outlook'
 
   return (
     <div className="page">
@@ -41,12 +42,23 @@ export default function CheckDetail() {
       <section className={`verdict verdict-${check.level}`}>
         <div className="verdict-top">
           <RiskBadge level={check.level} score={check.score} />
-          <span className="muted small">{check.kind === 'voice' ? 'Voice note' : 'Text message'} · checked {formatWhen(check.created_at)} by {check.created_by_name}</span>
+          <span className="muted small">{fromEmail ? 'Email from Outlook' : check.kind === 'voice' ? 'Voice note' : 'Text message'} · checked {formatWhen(check.created_at)} by {check.created_by_name}</span>
         </div>
         <h1>{HEADLINE[check.level]}</h1>
         <p className="verdict-text">{check.explanation}</p>
         <div className="meter" aria-hidden="true"><i style={{ width: `${check.score}%` }} /></div>
       </section>
+
+      {check.decision === 'none' && check.level !== 'low' && (
+        <section className="hold-banner" role="alert">
+          <b>Payment on hold.</b>
+          <span>
+            Don’t pay yet. It can only be released after you’ve called the person back on a number you already had and
+            confirmed it’s really them, and then entered your payment PIN.
+            {fromEmail && ' A video call set up by the sender doesn’t count: deepfakes can copy a face and voice live.'}
+          </span>
+        </section>
+      )}
 
       <div className="detail-grid">
         <div className="detail-main">
@@ -71,7 +83,7 @@ export default function CheckDetail() {
           </section>
 
           <section className="card">
-            <h2>{check.kind === 'voice' ? 'What the voice note says' : 'The message'}</h2>
+            <h2>{check.kind === 'voice' ? 'What the voice note says' : fromEmail ? 'The email' : 'The message'}</h2>
             {check.content ? <blockquote className="quote">{check.content}</blockquote> : <p className="muted">No transcript is available for this voice note.</p>}
             {check.language && <p className="small muted">Language: {check.language}</p>}
             {check.content_english && (
