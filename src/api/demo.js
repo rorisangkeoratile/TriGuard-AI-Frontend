@@ -174,7 +174,7 @@ const readAnswer = v => (v === true || v === 'true' ? true : v === false || v ==
 
 // Voice notes are the one check demo mode can't do in the browser: the AI-voice model and transcription run on the
 // TriGuard backend (POST /api/v1/voice/analyze, through Vite's /api proxy). The audio is analysed in memory there
-// and not stored. Returns null when the backend isn't running, and the check says so.
+// and not stored. Tries twice, then returns null.
 // The deployed site has no Vite proxy, so it calls the backend at VITE_API_URL directly (allowed by its CORS list).
 const VOICE_API = import.meta.env.PROD ? (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') : ''
 async function serverVoice(file) {
@@ -182,10 +182,18 @@ async function serverVoice(file) {
   const form = new FormData()
   form.append('file', file)
   form.append('language', 'en')
-  try {
-    const res = await fetch(VOICE_API + '/api/v1/voice/analyze', { method: 'POST', body: form })
-    return res.ok ? await res.json() : null
-  } catch { return null }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(VOICE_API + '/api/v1/voice/analyze', { method: 'POST', body: form })
+      if (res.ok) return await res.json()
+      const data = await res.json().catch(() => null)
+      // A file the server can't read won't work on a second try either.
+      if (res.status < 500) fail(422, typeof data?.detail === 'string' ? data.detail : 'TriGuard couldn’t read this voice note.')
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+    }
+  }
+  return null
 }
 
 function voiceSignal(score) {
@@ -497,6 +505,8 @@ export async function demoRequest(path, method, json, form) {
   if (parts[0] === 'checks') {
     if (route === '/checks/voice' && method === 'POST') {
       const server = await serverVoice(body.file)
+      // Never save a "Low risk" result for a voice nobody analysed.
+      if (!server) fail(503, 'Couldn’t reach the TriGuard server to check the voice, so nothing was saved. Check your internet connection, keep this page open, and try again.')
       db = load() // the server check takes a while; pick up changes made meanwhile
       return createCheck(user, 'voice', body, server)
     }

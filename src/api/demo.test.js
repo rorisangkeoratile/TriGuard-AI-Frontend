@@ -86,10 +86,20 @@ describe('demo mode API', () => {
   it('reads yes/no answers sent with a voice note upload', async () => {
     await owner()
     const form = new FormData()
+    form.append('file', new Blob(['audio'], { type: 'audio/ogg' }), 'note.ogg')
     form.append('new_payee_or_bank_change', 'true')
     form.append('larger_than_usual', 'false')
-    const check = await demoRequest('/checks/voice', 'POST', undefined, form)
-    expect(check.payment_answers).toEqual({ new_payee_or_bank_change: true, larger_than_usual: false, skip_approval: null })
+    const realFetch = globalThis.fetch
+    // The backend's voice check, answering for a genuine-sounding voice.
+    globalThis.fetch = async () => Response.json({ model: { available: true, synthetic_probability: 0.1 }, transcript: '' })
+    try {
+      const check = await demoRequest('/checks/voice', 'POST', undefined, form)
+      expect(check.payment_answers).toEqual({ new_payee_or_bank_change: true, larger_than_usual: false, skip_approval: null })
+      expect(check.guards.voice_clone.status).toBe('ran')
+      expect(check.voice_score).toBe(0.1)
+    } finally {
+      globalThis.fetch = realFetch
+    }
   })
 
   it('recognises retail scams: head office, airtime and till cash', async () => {
@@ -112,12 +122,10 @@ describe('demo mode API', () => {
     expect((await get('/dashboard')).released_this_month).toBe(1)
   })
 
-  it('reports voice analysis as unavailable instead of inventing a score', async () => {
+  it('saves no result, rather than a misleading "Low risk", when the voice could not be analysed', async () => {
     await owner()
-    const check = await demoRequest('/checks/voice', 'POST', undefined, new FormData())
-    expect(check.voice_score).toBeNull()
-    expect(check.guards.voice_clone.status).toBe('unavailable')
-    expect(check.guards.transcription.status).toBe('unavailable')
+    await expect(demoRequest('/checks/voice', 'POST', undefined, new FormData())).rejects.toMatchObject({ status: 503 })
+    expect((await get('/checks')).total).toBe(0)
   })
 
   it('keeps each store’s data separate', async () => {
