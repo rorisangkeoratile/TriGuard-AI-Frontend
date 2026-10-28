@@ -68,16 +68,35 @@ function simulatedLinkIntel(text) {
 }
 const withIntel = ev => ({ ...ev, linkIntel: ev.linkIntel || simulatedLinkIntel([ev.text, ev.subject, ev.qrUrl].filter(Boolean).join(' ')) })
 
+// Real AI-voice score from the backend's deepfake model (POST /api/v1/voice/analyze). The audio is analysed in memory
+// and never stored. Returns null when the server or model isn't available, so the caller can fall back to the demo score.
+async function realVoiceScore(file, meta) {
+  if (!file) return null
+  const form = new FormData()
+  form.append('file', file)
+  form.append('language', 'en')
+  for (const q of ['new_bank_details', 'skip_approval']) if (meta && meta[q]) form.append(q, 'true')
+  try {
+    const r = await request('/api/v1/voice/analyze', { method: 'POST', body: form })
+    return r.model && r.model.available && typeof r.model.synthetic_probability === 'number' ? r.model.synthetic_probability : null
+  } catch { return null }
+}
+
 const mock = {
   /** Text events: SMS, email, pasted messages, finished calls. */
   async checkEvent(ev, ctx) { await wait(150); return analyze(withIntel(ev), ctx) },
 
   /** Voice notes ('audio') and video clips ('videoFile'). Returns the scores and the full result. */
   async checkMedia({ kind, file, name, size, meta }, ctx) {
-    await wait(1300)
-    const sc = simulatedScore(name || (file && file.name) || '', size || (file && file.size) || 0)
+    const real = kind === 'audio' ? await realVoiceScore(file, meta) : null
+    if (real === null) await wait(1300)
+    const sc = real ?? simulatedScore(name || (file && file.name) || '', size || (file && file.size) || 0)
     const scores = kind === 'audio' ? { voiceScore: sc } : { faceScore: sc, lipsync: sc >= 0.7 }
-    return { scores, result: analyze(withIntel({ ...meta, channel: kind, ...scores }), ctx) }
+    const result = analyze(withIntel({ ...meta, channel: kind, ...scores }), ctx)
+    result.notes = [...(result.notes || []), real !== null
+      ? 'Voice score from TriGuard’s AI voice-clone model. The recording was analysed in memory and not stored.'
+      : `Demo only: the ${kind === 'audio' ? 'voice' : 'face'} score is simulated, not from an AI model.`]
+    return { scores, result }
   },
 
   /** Screenshots, photos and slips. OCR isn't simulated: the user can type the text. QR codes are decoded on the phone. */
