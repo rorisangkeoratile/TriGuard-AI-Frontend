@@ -11,15 +11,15 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "i18next": "^23.16.8",
-    "jsqr": "^1.4.0",
+    "@fontsource/dm-sans": "^5.1.1",
+    "@fontsource/space-grotesk": "^5.1.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
     "vite": "^8.3.5",
-    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.4"
   }
 }
